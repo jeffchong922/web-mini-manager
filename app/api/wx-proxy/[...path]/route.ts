@@ -40,7 +40,8 @@ async function handleProxy(
 
   const { path } = await params;
   const apiPath = path.join("/");
-  const url = `${baseUrl.replace(/\/+$/, "")}/${apiPath}`;
+  const queryString = new URL(request.url).search;
+  const url = `${baseUrl.replace(/\/+$/, "")}/${apiPath}${queryString}`;
 
   // Only forward safe headers
   const forwardHeaders = new Headers();
@@ -61,9 +62,14 @@ async function handleProxy(
           : undefined,
     });
 
+    // Strip Content-Encoding — fetch transparently decompresses, so the
+    // header would claim gzip but the body is already plain, breaking the browser.
+    const resHeaders = new Headers(response.headers);
+    resHeaders.delete("content-encoding");
+
     return new Response(response.body, {
       status: response.status,
-      headers: response.headers,
+      headers: resHeaders,
     });
   } catch {
     return Response.json(
