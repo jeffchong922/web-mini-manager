@@ -6,6 +6,7 @@ import Link from "next/link";
 const NAV_ITEMS = [
   { label: "Welcome", href: "/" },
   { label: "Mini Programs", href: "/mini-programs" },
+  { label: "Templates", href: "/templates" },
   { label: "Settings", href: "/settings" },
 ];
 
