@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { wxFetch, getWxBaseUrl } from "@/lib/wx-proxy";
-import type { ResponseData, MiniProgramItem } from "@/types/wx-api";
+import type { ResponseData, MiniProgramItem, TemplateItem } from "@/types/wx-api";
+import type { SubmitConfigItem } from "@/types/wx-api";
 
 const PAGE_SIZE = 10;
 
@@ -40,6 +41,25 @@ export default function MiniProgramsPage() {
     ok: boolean;
     msg: string;
   } | null>(null);
+  const [submitModal, setSubmitModal] = useState<{
+    appid: string;
+    appName: string;
+  } | null>(null);
+  const [submitEnv, setSubmitEnv] = useState("dev");
+  const [submitDirectCommit, setSubmitDirectCommit] = useState(false);
+  const [submitTemplateId, setSubmitTemplateId] = useState("");
+  const [submitUserVersion, setSubmitUserVersion] = useState("");
+  const [submitUserDesc, setSubmitUserDesc] = useState("");
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [submitResult, setSubmitResult] = useState<{
+    ok: boolean;
+    msg: string;
+  } | null>(null);
+  const [templateListOpen, setTemplateListOpen] = useState(false);
+  const [templateItems, setTemplateItems] = useState<TemplateItem[] | null>(null);
+  const [templateListLoading, setTemplateListLoading] = useState(false);
+  const [templateListError, setTemplateListError] = useState<string | null>(null);
+  const [templatePage, setTemplatePage] = useState(1);
 
   const load = useCallback(async (skipCache = false) => {
     if (skipCache) setError(null);
@@ -173,6 +193,124 @@ export default function MiniProgramsPage() {
       });
     } finally {
       setTesterLoading(false);
+    }
+  }
+
+  function getSubmitConfig(appid: string): SubmitConfigItem | undefined {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = localStorage.getItem("submitConfigs");
+      if (!raw) return;
+      const configs: SubmitConfigItem[] = JSON.parse(raw);
+      return configs.find((c) => c.appid === appid);
+    } catch {
+      return;
+    }
+  }
+
+  function openSubmitModal(appid: string, appName: string) {
+    setSubmitModal({ appid, appName });
+    setSubmitEnv("dev");
+    setSubmitDirectCommit(false);
+    setSubmitTemplateId("");
+    setSubmitUserVersion("");
+    setSubmitUserDesc("");
+    setSubmitResult(null);
+  }
+
+  async function openTemplateList() {
+    setTemplateListOpen(true);
+    if (templateItems) return;
+    setTemplateListLoading(true);
+    setTemplateListError(null);
+    try {
+      const res = await wxFetch<ResponseData<TemplateItem[]>>("gettemplatelist");
+      if (res.code === "000000" && res.succeed) {
+        setTemplateItems(res.data ?? []);
+      } else {
+        setTemplateListError(res.message || "加载模板失败");
+      }
+    } catch (e) {
+      setTemplateListError(e instanceof Error ? e.message : "加载模板失败");
+    } finally {
+      setTemplateListLoading(false);
+    }
+  }
+
+  function selectTemplate(item: TemplateItem) {
+    setSubmitTemplateId(String(item.templateId));
+    setSubmitUserVersion(item.userVersion);
+    setSubmitUserDesc(item.userDesc);
+    setTemplateListOpen(false);
+  }
+
+  async function handleSubmit() {
+    if (!submitModal) return;
+    const config = getSubmitConfig(submitModal.appid);
+    if (!config) {
+      setSubmitResult({ ok: false, msg: "未找到该小程序的提交配置" });
+      return;
+    }
+    if (!submitTemplateId.trim()) {
+      setSubmitResult({ ok: false, msg: "请输入模板 ID" });
+      return;
+    }
+    setSubmitLoading(true);
+    setSubmitResult(null);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { appid: _a, isStop: _i, ext, ...extJsonExtra } = config;
+    const extJson = {
+      ...extJsonExtra,
+      extEnable: true,
+      extAppid: submitModal.appid,
+      directCommit: submitDirectCommit,
+      ext: {
+        appName: ext.appName,
+        abbreviation: ext.abbreviation || ext.appName,
+        fileName: ext.fileName || "",
+        theme: ext.theme || "public",
+        brand: ext.brand || "",
+        customerShareBgName: ext.customerShareBgName || "",
+        oilCashName: "代金券",
+        hideOilCashRegular: true,
+        shareDesc: `${ext.appName}，精彩人-车-生活`,
+        showWithdrawalAlipayAccess: !!ext.showWithdrawalAlipayAccess,
+        indexNewFormat: !!ext.indexNewFormat,
+        consoleLog: true,
+        configOrderClassify: ext.configOrderClassify || null,
+        ...ext,
+        env: submitEnv,
+        appid: submitModal.appid,
+      },
+    };
+    const codeCommitParams = {
+      appid: submitModal.appid,
+      templateId: Number(submitTemplateId),
+      userVersion: submitUserVersion,
+      userDesc: submitUserDesc,
+      extJson,
+    };
+    try {
+      const res = await wxFetch<ResponseData<null>>(
+        "codeCommit",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(codeCommitParams),
+        },
+        false
+      );
+      setSubmitResult({
+        ok: res.succeed,
+        msg: res.succeed ? "提交成功" : res.message || "提交失败",
+      });
+    } catch (e) {
+      setSubmitResult({
+        ok: false,
+        msg: e instanceof Error ? e.message : "请求失败",
+      });
+    } finally {
+      setSubmitLoading(false);
     }
   }
 
@@ -330,6 +468,21 @@ export default function MiniProgramsPage() {
                           >
                             体验者
                           </button>
+                          {getSubmitConfig(item.authorizer_appid) && item.status === 'OPEN' ? (
+                            <button
+                              onClick={() => openSubmitModal(item.authorizer_appid, item.appName)}
+                              className="rounded-lg px-2 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                            >
+                              提交
+                            </button>
+                          ) : (
+                            <span
+                              className="rounded-lg px-2 py-1 text-xs text-zinc-400 dark:text-zinc-500"
+                              title="未配置提交信息"
+                            >
+                              提交
+                            </span>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -447,6 +600,233 @@ export default function MiniProgramsPage() {
                 />
               ) : null}
             </div>
+          </div>
+        </div>
+      )}
+
+      {submitModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={() => {
+            setSubmitModal(null);
+            setSubmitResult(null);
+          }}
+        >
+          <div
+            className="mx-4 w-full max-w-md rounded-xl border border-zinc-200 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-950"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                提交体验
+              </h2>
+              <button
+                onClick={() => {
+                  setSubmitModal(null);
+                  setSubmitResult(null);
+                }}
+                className="rounded-lg px-2 py-1 text-sm text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="mb-4 break-all text-xs text-zinc-500 dark:text-zinc-400">
+              {submitModal.appName} ({submitModal.appid})
+            </p>
+
+            <div className="mb-4 flex gap-3 flex-wrap">
+              <label className="flex items-center gap-1.5 text-sm text-zinc-700 dark:text-zinc-300">
+                环境:
+                <select
+                  value={submitEnv}
+                  onChange={(e) => setSubmitEnv(e.target.value)}
+                  disabled={submitDirectCommit}
+                  className="rounded-lg border border-zinc-300 px-2 py-1 text-sm focus:border-zinc-500 focus:outline-none disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
+                >
+                  <option value="dev">开发环境</option>
+                  <option value="test">测试环境</option>
+                  <option value="uat">uat环境</option>
+                  <option value="prod">生产环境</option>
+                </select>
+              </label>
+              <label className="flex items-center gap-1.5 text-sm text-zinc-700 dark:text-zinc-300">
+                <input
+                  type="checkbox"
+                  checked={submitDirectCommit}
+                  onChange={(e) => {
+                    setSubmitDirectCommit(e.target.checked);
+                    if (e.target.checked) setSubmitEnv("prod");
+                  }}
+                  className="rounded"
+                />
+                directCommit
+              </label>
+            </div>
+
+            <div className="mb-3 flex items-end gap-2">
+              <div className="flex-1">
+                <label className="block text-xs text-zinc-500 mb-1">模板 ID</label>
+                <input
+                  type="number"
+                  value={submitTemplateId}
+                  onChange={(e) => setSubmitTemplateId(e.target.value)}
+                  className="w-full rounded-lg border border-zinc-300 px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
+                />
+              </div>
+              <button
+                onClick={openTemplateList}
+                className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+              >
+                选择模版
+              </button>
+            </div>
+
+            <input
+              type="text"
+              value={submitUserVersion}
+              onChange={(e) => setSubmitUserVersion(e.target.value)}
+              placeholder="版本号 (userVersion)"
+              className="mb-3 w-full rounded-lg border border-zinc-300 px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
+            />
+            <input
+              type="text"
+              value={submitUserDesc}
+              onChange={(e) => setSubmitUserDesc(e.target.value)}
+              placeholder="版本描述 (userDesc)"
+              className="mb-4 w-full rounded-lg border border-zinc-300 px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
+            />
+
+            {submitLoading && (
+              <p className="text-center text-sm text-zinc-500">提交中...</p>
+            )}
+            {submitResult && !submitLoading && (
+              <p
+                className={`mb-3 text-sm ${
+                  submitResult.ok
+                    ? "text-green-600 dark:text-green-400"
+                    : "text-red-500"
+                }`}
+                role="alert"
+              >
+                {submitResult.msg}
+              </p>
+            )}
+
+            <button
+              onClick={handleSubmit}
+              disabled={submitLoading}
+              className="w-full rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-black dark:hover:bg-zinc-200"
+            >
+              提交
+            </button>
+          </div>
+        </div>
+      )}
+
+      {templateListOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={() => setTemplateListOpen(false)}
+        >
+          <div
+            className="mx-4 max-h-[80vh] w-full max-w-2xl overflow-auto rounded-xl border border-zinc-200 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-950"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                选择模版
+              </h2>
+              <button
+                onClick={() => setTemplateListOpen(false)}
+                className="rounded-lg px-2 py-1 text-sm text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+              >
+                ✕
+              </button>
+            </div>
+
+            {templateListError ? (
+              <p className="text-sm text-red-500" role="alert">{templateListError}</p>
+            ) : templateListLoading || templateItems === null ? (
+              <p className="text-sm text-zinc-500">Loading templates...</p>
+            ) : templateItems.length === 0 ? (
+              <p className="text-sm text-zinc-500">No templates found.</p>
+            ) : (
+              (() => {
+                const tpTotal = Math.max(1, Math.ceil(templateItems.length / PAGE_SIZE));
+                const tpSafe = Math.min(templatePage, tpTotal);
+                const tpPaged = templateItems.slice((tpSafe - 1) * PAGE_SIZE, tpSafe * PAGE_SIZE);
+                return (
+                  <>
+                    <table className="w-full text-left text-sm">
+                      <thead className="border-b border-zinc-200 dark:border-zinc-800">
+                        <tr>
+                          <th className="py-2 pr-3 font-medium text-zinc-500 dark:text-zinc-400">Template ID</th>
+                          <th className="py-2 pr-3 font-medium text-zinc-500 dark:text-zinc-400">Version</th>
+                          <th className="py-2 pr-3 font-medium text-zinc-500 dark:text-zinc-400">Description</th>
+                          <th className="py-2 pr-3 font-medium text-zinc-500 dark:text-zinc-400">Created</th>
+                          <th className="py-2" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tpPaged.map((t) => (
+                          <tr key={t.templateId} className="border-b border-zinc-100 last:border-b-0 dark:border-zinc-800/50">
+                            <td className="py-2 pr-3 font-mono text-xs text-zinc-500 dark:text-zinc-400">{t.templateId}</td>
+                            <td className="py-2 pr-3 text-zinc-900 dark:text-zinc-50">{t.userVersion}</td>
+                            <td className="py-2 pr-3 text-zinc-900 dark:text-zinc-50">{t.userDesc}</td>
+                            <td className="py-2 pr-3 text-xs text-zinc-500 dark:text-zinc-400">
+                              {t.createTime ? new Date(t.createTime * 1000).toLocaleString("zh-CN") : "-"}
+                            </td>
+                            <td className="py-2 text-right">
+                              <button
+                                onClick={() => selectTemplate(t)}
+                                className="rounded-lg bg-zinc-900 px-3 py-1 text-xs font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-black dark:hover:bg-zinc-200"
+                              >
+                                选择
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <div className="mt-4 flex items-center justify-between">
+                      <span className="text-xs text-zinc-400">
+                        {templateItems.length} templates
+                      </span>
+                      <nav className="flex items-center gap-1">
+                        <button
+                          onClick={() => setTemplatePage((p) => Math.max(1, p - 1))}
+                          disabled={tpSafe <= 1}
+                          className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 disabled:opacity-30 disabled:cursor-not-allowed dark:text-zinc-400 dark:hover:bg-zinc-800"
+                        >
+                          Prev
+                        </button>
+                        {Array.from({ length: tpTotal }, (_, i) => i + 1).map((n) => (
+                          <button
+                            key={n}
+                            onClick={() => setTemplatePage(n)}
+                            className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
+                              n === tpSafe
+                                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-black"
+                                : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                            }`}
+                          >
+                            {n}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => setTemplatePage((p) => Math.min(tpTotal, p + 1))}
+                          disabled={tpSafe >= tpTotal}
+                          className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 disabled:opacity-30 disabled:cursor-not-allowed dark:text-zinc-400 dark:hover:bg-zinc-800"
+                        >
+                          Next
+                        </button>
+                      </nav>
+                    </div>
+                  </>
+                );
+              })()
+            )}
           </div>
         </div>
       )}

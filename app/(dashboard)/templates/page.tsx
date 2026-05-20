@@ -30,6 +30,7 @@ export default function TemplatesPage() {
   const [draftLoading, setDraftLoading] = useState(false);
   const [addingId, setAddingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [copiedId, setCopiedId] = useState<number | null>(null);
 
   const load = useCallback(async (skipCache = false) => {
     if (skipCache) setError(null);
@@ -232,6 +233,22 @@ export default function TemplatesPage() {
                       {formatTimestamp(item.createTime)}
                     </td>
                     <td className="px-5 py-3">
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(
+                            JSON.stringify({
+                              templateId: item.templateId,
+                              userVersion: item.userVersion,
+                              userDesc: item.userDesc,
+                            })
+                          );
+                          setCopiedId(item.templateId);
+                          setTimeout(() => setCopiedId(null), 1500);
+                        }}
+                        className="rounded-lg px-2 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                      >
+                        {copiedId === item.templateId ? "已复制" : "复制"}
+                      </button>
                       <button
                         onClick={() => deleteTemplate(item.templateId)}
                         disabled={deletingId === item.templateId}

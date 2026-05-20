@@ -1,7 +1,7 @@
 // extJson 内的 ext 扩展配置
 type ExtConfig = {
   env: string;
-  extAppid: string;
+  appid: string;
   consoleLog?: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any;
@@ -51,6 +51,15 @@ export type TemplateItem = {
   createTime: number;
   sourceMiniProgramAppid: string;
   sourceMiniProgram: string;
+};
+
+// 提交配置项 = ext 内容 + extJson 额外字段 + 元数据
+export type SubmitConfigItem = {
+  appid: string;
+  isStop?: boolean;
+  ext: Record<string, unknown>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any;
 };
 
 export type DraftItem = {

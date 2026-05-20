@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { label: "Welcome", href: "/" },
   { label: "Mini Programs", href: "/mini-programs" },
   { label: "Templates", href: "/templates" },
+  { label: "Submit Configs", href: "/submit-configs" },
   { label: "Settings", href: "/settings" },
 ];
 
