@@ -76,14 +76,19 @@ Supported methods: GET, POST, PUT, DELETE. Only `content-type`, `authorization`,
 |---|---|---|
 | `/login` | `app/login/page.tsx` | Login form with redirect param support |
 | `/` | `app/(dashboard)/page.tsx` | Welcome page, shows logged-in username |
-| `/mini-programs` | `app/(dashboard)/mini-programs/page.tsx` | Paginated table of authorized mini programs (client-side search + pagination) |
-| `/templates` | `app/(dashboard)/templates/page.tsx` | Paginated table of code templates |
-| `/settings` | `app/(dashboard)/settings/page.tsx` | Configure WeChat API base URL (stored in localStorage) |
+| `/mini-programs` | `app/(dashboard)/mini-programs/page.tsx` | Paginated table of authorized mini programs (client-side search + pagination). QR code viewer, tester bind/unbind, and code-commit submission modals that read submit configs from localStorage. |
+| `/templates` | `app/(dashboard)/templates/page.tsx` | Paginated table of code templates, with draft-to-template "add" modal and delete actions. |
+| `/submit-configs` | `app/(dashboard)/submit-configs/page.tsx` | Manages ext.json submission configs in localStorage (key `submitConfigs`). Import/export JSON, edit, delete, toggle isStop. Data consumed by mini-programs page for the "Submit" action. |
+| `/settings` | `app/(dashboard)/settings/page.tsx` | Configure WeChat API base URL (stored in localStorage under key `wxBaseUrl`) |
 | 404 | `app/not-found.tsx` | Custom 404 page |
 
 The `(dashboard)` route group shares a sidebar layout (`app/(dashboard)/layout.tsx`) with nav links and a Sign Out button that POSTs to `/api/logout`.
 
 **Data fetching pattern**: Client pages defer initial data loads past render via `useEffect(() => { queueMicrotask(() => { load(); }); }, [load])`. This avoids blocking the first paint. The `load` callback is wrapped in `useCallback` and accepts a `skipCache` boolean — pass `true` for refresh operations, `undefined`/omitted for cached reads.
+
+**Cross-page localStorage**: The `/submit-configs` page persists configs to `localStorage` under key `submitConfigs`. The `/mini-programs` page reads the same key to check whether each mini-program has a submit config — if present, the "Submit" button is active; otherwise it's greyed out. Both pages must stay in sync on the data shape (`SubmitConfigItem[]`).
+
+**No test framework**: No test runner (vitest, jest, etc.) is configured. There are no test files.
 
 ### API response format
 
