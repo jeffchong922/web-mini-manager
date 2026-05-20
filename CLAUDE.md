@@ -24,8 +24,24 @@ npm run lint     # ESLint (Next.js core-web-vitals + typescript rules)
 
 This is **not** standard Next.js. APIs, conventions, and file structure may differ from your training data. Check `node_modules/next/dist/docs/` before writing any Next.js-specific code. Notable differences observed:
 
-- **No `middleware.ts`**. Instead, `proxy.ts` exports a `proxy` function and a `config.matcher`. The runtime picks it up as middleware automatically.
+- **No `middleware.ts`**. Instead, `proxy.ts` exports a named `proxy` function (receives `NextRequest`) and a `config.matcher`. The runtime picks it up as middleware automatically.
 - Route handlers receive `params` as a `Promise` (e.g. `{ params }: { params: Promise<{ path: string[] }> }`).
+
+### Tailwind CSS v4
+
+Uses the Tailwind v4 CSS-first configuration (not `tailwind.config.js`). Key differences from v3:
+
+- `globals.css` uses `@import "tailwindcss"` (not `@tailwind base/components/utilities`).
+- Theme customization uses `@theme inline { ... }` blocks in CSS.
+- The PostCSS plugin is `@tailwindcss/postcss` (not `tailwindcss`).
+
+### Shared types (`types/wx-api.ts`)
+
+WeChat API response/request types live here: `ResponseData<T>`, `MiniProgramItem`, `TemplateItem`, `DraftItem`, `CodeCommitParams`, `ExtConfig`, `ExtJson`. Import from `@/types/wx-api`.
+
+### `server-only` convention
+
+`lib/session.ts` imports `server-only` to prevent accidental client-side bundling of server secrets (JWT signing, cookie manipulation). Do the same for any new file that handles server-side secrets.
 
 ### Import alias
 
@@ -66,6 +82,8 @@ Supported methods: GET, POST, PUT, DELETE. Only `content-type`, `authorization`,
 | 404 | `app/not-found.tsx` | Custom 404 page |
 
 The `(dashboard)` route group shares a sidebar layout (`app/(dashboard)/layout.tsx`) with nav links and a Sign Out button that POSTs to `/api/logout`.
+
+**Data fetching pattern**: Client pages defer initial data loads past render via `useEffect(() => { queueMicrotask(() => { load(); }); }, [load])`. This avoids blocking the first paint. The `load` callback is wrapped in `useCallback` and accepts a `skipCache` boolean — pass `true` for refresh operations, `undefined`/omitted for cached reads.
 
 ### API response format
 
