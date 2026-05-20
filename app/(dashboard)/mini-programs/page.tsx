@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
-import { wxFetch } from "@/lib/wx-proxy";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { wxFetch, getWxBaseUrl } from "@/lib/wx-proxy";
 
 type MiniProgramItem = {
   authorizer_appid: string;
@@ -36,6 +36,24 @@ export default function MiniProgramsPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [refreshing, setRefreshing] = useState(false);
+  const [qrModal, setQrModal] = useState<{
+    appid: string;
+    appName: string;
+  } | null>(null);
+  const [qrBlobUrl, setQrBlobUrl] = useState<string | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrError, setQrError] = useState<string | null>(null);
+  const prevBlobUrlRef = useRef<string | null>(null);
+  const [testerModal, setTesterModal] = useState<{
+    appid: string;
+    appName: string;
+  } | null>(null);
+  const [wechatId, setWechatId] = useState("");
+  const [testerLoading, setTesterLoading] = useState(false);
+  const [testerResult, setTesterResult] = useState<{
+    ok: boolean;
+    msg: string;
+  } | null>(null);
 
   const load = useCallback(async (skipCache = false) => {
     if (skipCache) setError(null);
@@ -54,6 +72,123 @@ export default function MiniProgramsPage() {
       setError(e instanceof Error ? e.message : "Failed to load mini programs");
     }
   }, []);
+
+  const handleViewQrCode = useCallback((appid: string, appName: string) => {
+    setQrModal({ appid, appName });
+    setQrBlobUrl(null);
+    setQrError(null);
+    setQrLoading(true);
+  }, []);
+
+  useEffect(() => {
+    if (!qrModal) return;
+    const modal = qrModal;
+    let cancelled = false;
+
+    async function fetchQr() {
+      setQrLoading(true);
+      setQrError(null);
+      setQrBlobUrl(null);
+
+      try {
+        const baseUrl = getWxBaseUrl();
+        if (!baseUrl) throw new Error("微信API地址未配置，请在设置中配置。");
+
+        const res = await fetch(
+          `/api/wx-proxy/getTestQrcode?appid=${encodeURIComponent(modal.appid)}`,
+          { headers: { "X-Wx-Base-Url": baseUrl } }
+        );
+
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          throw new Error(text || `请求失败 (${res.status})`);
+        }
+
+        const blob = await res.blob();
+        if (cancelled) return;
+
+        const url = URL.createObjectURL(blob);
+        if (prevBlobUrlRef.current) URL.revokeObjectURL(prevBlobUrlRef.current);
+        prevBlobUrlRef.current = url;
+        setQrBlobUrl(url);
+      } catch (e) {
+        if (!cancelled) {
+          setQrError(e instanceof Error ? e.message : "获取二维码失败");
+        }
+      } finally {
+        if (!cancelled) setQrLoading(false);
+      }
+    }
+
+    fetchQr();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [qrModal]);
+
+  // Revoke blob URL on unmount
+  useEffect(() => {
+    return () => {
+      if (prevBlobUrlRef.current) {
+        URL.revokeObjectURL(prevBlobUrlRef.current);
+      }
+    };
+  }, []);
+
+  function openTesterModal(appid: string, appName: string) {
+    setTesterModal({ appid, appName });
+    setWechatId("");
+    setTesterResult(null);
+  }
+
+  async function handleBind() {
+    if (!testerModal || !wechatId.trim()) return;
+    setTesterLoading(true);
+    setTesterResult(null);
+    try {
+      const res = await wxFetch<ResponseData<null>>(
+        `bindTester?appid=${encodeURIComponent(testerModal.appid)}&wechatId=${encodeURIComponent(wechatId.trim())}`,
+        { method: "POST" },
+        false
+      );
+      setTesterResult({
+        ok: res.succeed,
+        msg: res.succeed ? "绑定成功" : res.message || "绑定失败",
+      });
+    } catch (e) {
+      setTesterResult({
+        ok: false,
+        msg: e instanceof Error ? e.message : "请求失败",
+      });
+    } finally {
+      setTesterLoading(false);
+    }
+  }
+
+  async function handleUnbind() {
+    if (!testerModal || !wechatId.trim()) return;
+    setTesterLoading(true);
+    setTesterResult(null);
+    try {
+      const res = await wxFetch<ResponseData<null>>(
+        `unBindTester?appid=${encodeURIComponent(testerModal.appid)}&wechatId=${encodeURIComponent(wechatId.trim())}`,
+        { method: "POST" },
+        false
+      );
+      setTesterResult({
+        ok: res.succeed,
+        msg: res.succeed ? "解绑成功" : res.message || "解绑失败",
+      });
+    } catch (e) {
+      setTesterResult({
+        ok: false,
+        msg: e instanceof Error ? e.message : "请求失败",
+      });
+    } finally {
+      setTesterLoading(false);
+    }
+  }
 
   useEffect(() => {
     queueMicrotask(() => { load(); });
@@ -165,6 +300,9 @@ export default function MiniProgramsPage() {
                       <th className="px-5 py-3 font-medium text-zinc-500 dark:text-zinc-400">
                         Auth Time
                       </th>
+                      <th className="px-5 py-3 font-medium text-zinc-500 dark:text-zinc-400">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -192,6 +330,20 @@ export default function MiniProgramsPage() {
                         </td>
                         <td className="px-5 py-3 text-zinc-500 dark:text-zinc-400">
                           {formatTimestamp(item.auth_time)}
+                        </td>
+                        <td className="px-5 py-3">
+                          <button
+                            onClick={() => handleViewQrCode(item.authorizer_appid, item.appName)}
+                            className="rounded-lg px-2 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                          >
+                            查看二维码
+                          </button>
+                          <button
+                            onClick={() => openTesterModal(item.authorizer_appid, item.appName)}
+                            className="rounded-lg px-2 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                          >
+                            体验者
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -238,6 +390,159 @@ export default function MiniProgramsPage() {
             </>
           )}
         </>
+      )}
+
+      {qrModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={() => {
+            setQrModal(null);
+            setQrBlobUrl(null);
+            setQrError(null);
+          }}
+        >
+          <div
+            className="mx-4 w-full max-w-sm rounded-xl border border-zinc-200 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-950"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                查看二维码
+              </h2>
+              <button
+                onClick={() => {
+                  setQrModal(null);
+                  setQrBlobUrl(null);
+                  setQrError(null);
+                }}
+                className="rounded-lg px-2 py-1 text-sm text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="mb-4 break-all text-xs text-zinc-500 dark:text-zinc-400">
+              {qrModal.appName} ({qrModal.appid})
+            </p>
+
+            <div className="flex min-h-[200px] items-center justify-center">
+              {qrLoading ? (
+                <div className="flex flex-col items-center gap-2">
+                  <svg
+                    className="h-8 w-8 animate-spin text-zinc-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                    />
+                  </svg>
+                  <span className="text-sm text-zinc-500">加载中...</span>
+                </div>
+              ) : qrError ? (
+                <p className="text-sm text-red-500" role="alert">
+                  {qrError}
+                </p>
+              ) : qrBlobUrl ? (
+                <img
+                  src={qrBlobUrl}
+                  alt={`QR Code for ${qrModal.appName}`}
+                  className="h-auto max-w-full"
+                />
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {testerModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={() => {
+            setTesterModal(null);
+            setWechatId("");
+            setTesterResult(null);
+          }}
+        >
+          <div
+            className="mx-4 w-full max-w-sm rounded-xl border border-zinc-200 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-950"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                体验者管理
+              </h2>
+              <button
+                onClick={() => {
+                  setTesterModal(null);
+                  setWechatId("");
+                  setTesterResult(null);
+                }}
+                className="rounded-lg px-2 py-1 text-sm text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="mb-4 break-all text-xs text-zinc-500 dark:text-zinc-400">
+              {testerModal.appName} ({testerModal.appid})
+            </p>
+
+            <input
+              type="text"
+              value={wechatId}
+              onChange={(e) => {
+                setWechatId(e.target.value);
+                setTesterResult(null);
+              }}
+              placeholder="输入微信号"
+              className="mb-4 w-full rounded-lg border border-zinc-300 px-4 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
+            />
+
+            <div className="mb-4 flex gap-3">
+              <button
+                onClick={handleBind}
+                disabled={testerLoading || !wechatId.trim()}
+                className="flex-1 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-black dark:hover:bg-zinc-200"
+              >
+                绑定用户
+              </button>
+              <button
+                onClick={handleUnbind}
+                disabled={testerLoading || !wechatId.trim()}
+                className="flex-1 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                解绑用户
+              </button>
+            </div>
+
+            {testerLoading && (
+              <p className="text-center text-sm text-zinc-500">处理中...</p>
+            )}
+            {testerResult && !testerLoading && (
+              <p
+                className={`text-sm ${
+                  testerResult.ok
+                    ? "text-green-600 dark:text-green-400"
+                    : "text-red-500"
+                }`}
+                role="alert"
+              >
+                {testerResult.msg}
+              </p>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
