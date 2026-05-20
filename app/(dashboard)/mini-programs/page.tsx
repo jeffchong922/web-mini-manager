@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { wxFetch } from "@/lib/wx-proxy";
 
 type MiniProgramItem = {
@@ -35,30 +35,29 @@ export default function MiniProgramsPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = useCallback(async (skipCache = false) => {
+    if (skipCache) setError(null);
+    try {
+      const res = await wxFetch<ResponseData<MiniProgramItem[]>>(
+        "getAuthorizerList?limit=499",
+        {},
+        skipCache ? false : undefined
+      );
+      if (res.code === "000000" && res.succeed) {
+        setItems(res.data);
+      } else {
+        setError(res.message || "Failed to load mini programs");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load mini programs");
+    }
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const res = await wxFetch<ResponseData<MiniProgramItem[]>>(
-          "getAuthorizerList?limit=499"
-        );
-        if (!cancelled) {
-          if (res.code === "000000" && res.succeed) {
-            setItems(res.data);
-          } else {
-            setError(res.message || "Failed to load mini programs");
-          }
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Failed to load mini programs");
-        }
-      }
-    }
-    load();
-    return () => { cancelled = true; };
-  }, []);
+    queueMicrotask(() => { load(); });
+  }, [load]);
 
   const filtered = useMemo(() => {
     if (!items) return [];
@@ -88,13 +87,39 @@ export default function MiniProgramsPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          Mini Programs
-        </h1>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Authorized mini-programs from the WeChat third-party platform.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+            Mini Programs
+          </h1>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            Authorized mini-programs from the WeChat third-party platform.
+          </p>
+        </div>
+        <button
+          onClick={async () => {
+            setRefreshing(true);
+            await load(true);
+            setRefreshing(false);
+          }}
+          disabled={refreshing}
+          className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 disabled:opacity-50 dark:text-zinc-400 dark:hover:bg-zinc-800"
+          title="Refresh data"
+        >
+          <svg
+            className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182"
+            />
+          </svg>
+        </button>
       </div>
 
       {error ? (
