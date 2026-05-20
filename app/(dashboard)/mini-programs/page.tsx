@@ -2,21 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { wxFetch, getWxBaseUrl } from "@/lib/wx-proxy";
-
-type MiniProgramItem = {
-  authorizer_appid: string;
-  refresh_token: string;
-  appName: string;
-  auth_time: string;
-  status: string;
-};
-
-type ResponseData<T> = {
-  code: string;
-  data: T;
-  message: string;
-  succeed: boolean;
-};
+import type { ResponseData, MiniProgramItem } from "@/types/wx-api";
 
 const PAGE_SIZE = 10;
 

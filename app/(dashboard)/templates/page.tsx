@@ -2,35 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { wxFetch } from "@/lib/wx-proxy";
-
-type TemplateItem = {
-  draftId: number;
-  templateId: number;
-  userVersion: string;
-  userDesc: string;
-  templateType: number;
-  createTime: number;
-  sourceMiniProgramAppid: string;
-  sourceMiniProgram: string;
-};
-
-type DraftItem = {
-  draftId: number;
-  templateId: number | null;
-  userVersion: string;
-  userDesc: string;
-  templateType: number | null;
-  createTime: number;
-  sourceMiniProgramAppid: string;
-  sourceMiniProgram: string;
-};
-
-type ResponseData<T> = {
-  code: string;
-  data: T;
-  message: string;
-  succeed: boolean;
-};
+import type { ResponseData, TemplateItem, DraftItem } from "@/types/wx-api";
 
 const PAGE_SIZE = 10;
 
