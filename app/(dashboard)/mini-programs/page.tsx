@@ -17,6 +17,20 @@ function formatTimestamp(ts: string) {
   });
 }
 
+function getPageNumbers(current: number, total: number): (number | "...")[] {
+  if (total <= 1) return [1];
+  const pages: (number | "...")[] = [];
+  const delta = 2;
+  pages.push(1);
+  const rangeStart = Math.max(2, current - delta);
+  const rangeEnd = Math.min(total - 1, current + delta);
+  if (rangeStart > 2) pages.push("...");
+  for (let i = rangeStart; i <= rangeEnd; i++) pages.push(i);
+  if (rangeEnd < total - 1) pages.push("...");
+  pages.push(total);
+  return pages;
+}
+
 export default function MiniProgramsPage() {
   const [items, setItems] = useState<MiniProgramItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -502,8 +516,10 @@ export default function MiniProgramsPage() {
                   >
                     Prev
                   </button>
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                    (n) => (
+                  {getPageNumbers(safePage, totalPages).map((n, i) =>
+                    n === "..." ? (
+                      <span key={`ellipsis-${i}`} className="px-2 text-zinc-400">…</span>
+                    ) : (
                       <button
                         key={n}
                         onClick={() => setPage(n)}
@@ -801,19 +817,23 @@ export default function MiniProgramsPage() {
                         >
                           Prev
                         </button>
-                        {Array.from({ length: tpTotal }, (_, i) => i + 1).map((n) => (
-                          <button
-                            key={n}
-                            onClick={() => setTemplatePage(n)}
-                            className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
-                              n === tpSafe
-                                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-black"
-                                : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-                            }`}
-                          >
-                            {n}
-                          </button>
-                        ))}
+                        {getPageNumbers(tpSafe, tpTotal).map((n, i) =>
+                          n === "..." ? (
+                            <span key={`ellipsis-${i}`} className="px-2 text-zinc-400">…</span>
+                          ) : (
+                            <button
+                              key={n}
+                              onClick={() => setTemplatePage(n)}
+                              className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
+                                n === tpSafe
+                                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-black"
+                                  : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                              }`}
+                            >
+                              {n}
+                            </button>
+                          )
+                        )}
                         <button
                           onClick={() => setTemplatePage((p) => Math.min(tpTotal, p + 1))}
                           disabled={tpSafe >= tpTotal}

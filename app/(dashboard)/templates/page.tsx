@@ -19,6 +19,20 @@ function formatTimestamp(ts: number) {
   });
 }
 
+function getPageNumbers(current: number, total: number): (number | "...")[] {
+  if (total <= 1) return [1];
+  const pages: (number | "...")[] = [];
+  const delta = 2;
+  pages.push(1);
+  const rangeStart = Math.max(2, current - delta);
+  const rangeEnd = Math.min(total - 1, current + delta);
+  if (rangeStart > 2) pages.push("...");
+  for (let i = rangeStart; i <= rangeEnd; i++) pages.push(i);
+  if (rangeEnd < total - 1) pages.push("...");
+  if (total > 1) pages.push(total);
+  return pages;
+}
+
 export default function TemplatesPage() {
   const [items, setItems] = useState<TemplateItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -275,19 +289,19 @@ export default function TemplatesPage() {
               >
                 Prev
               </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
+              {getPageNumbers(safePage, totalPages).map((n) =>
                 <button
                   key={n}
-                  onClick={() => setPage(n)}
+                  onClick={() => setPage(n as number)}
                   className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
                     n === safePage
                       ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-black"
                       : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
                   }`}
                 >
-                  {n}
+                  {n === "..." ? "…" : n}
                 </button>
-              ))}
+              )}
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={safePage >= totalPages}
