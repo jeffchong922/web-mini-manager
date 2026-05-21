@@ -34,9 +34,11 @@ export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const session = await getSession(request);
   const isPublic = PUBLIC_PATHS.includes(pathname);
+  const host = request.headers.get("host") || `localhost:${process.env.PORT || "3000"}`;
+  const proto = request.headers.get("x-forwarded-proto") || "http";
 
   if (isPublic && session) {
-    return NextResponse.redirect(new URL("/", request.url));
+    return NextResponse.redirect(new URL("/", `${proto}://${host}`));
   }
 
   if (!isPublic && !session) {
@@ -45,7 +47,7 @@ export async function proxy(request: NextRequest) {
         ? `?redirect=${encodeURIComponent(pathname + search)}`
         : "";
     return NextResponse.redirect(
-      new URL(`/login${redirectParam}`, request.url)
+      new URL(`/login${redirectParam}`, `${proto}://${host}`)
     );
   }
 
