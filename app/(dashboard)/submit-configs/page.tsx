@@ -46,11 +46,20 @@ function normalizeImport(input: unknown): SubmitConfigItem[] {
       extraFields = restExtJson;
       isStop = item.isStop;
     } else {
-      // Bare ExtConfig: all fields (minus appid/isStop variants) go into ext
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { isStop: _isStop, appid: _a, miniAppId: _m, extAppid: _e, ...rest } = item;
-      extFields = rest;
-      isStop = item.isStop;
+      // Bare ExtConfig or SubmitConfigItem: check if item.ext is already the ext object
+      if (item.ext && typeof item.ext === "object") {
+        // SubmitConfigItem exported format: use ext directly, other fields as extra
+        const { ext, isStop: _isStop, appid: _a, miniAppId: _m, extAppid: _e, ...rest } = item;
+        extFields = ext;
+        extraFields = rest;
+        isStop = item.isStop;
+      } else {
+        // Truly bare ExtConfig with no ext field: all remaining fields go into ext
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { isStop: _isStop, appid: _a, miniAppId: _m, extAppid: _e, ext: _ext, ...rest } = item;
+        extFields = rest;
+        isStop = item.isStop;
+      }
     }
     const appid = item?.appid || item?.miniAppId || item?.extAppid || "";
 
