@@ -10,17 +10,18 @@ if (!SECRET || SECRET.length < 32) {
 
 const encodedKey = new TextEncoder().encode(SECRET);
 const COOKIE_NAME = "session";
-const MAX_AGE = 1800; // 30 minutes
+const MAX_AGE = 10800; // 3 hours
 
-type SessionPayload = {
+export type SessionPayload = {
   username: string;
+  role: string;
 };
 
 async function encrypt(payload: SessionPayload) {
   return new SignJWT({ ...payload })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("30m")
+    .setExpirationTime("3h")
     .sign(encodedKey);
 }
 
@@ -36,9 +37,9 @@ async function decrypt(session: string | undefined) {
   }
 }
 
-export async function createSession(username: string) {
+export async function createSession(username: string, role: string) {
   const expiresAt = new Date(Date.now() + MAX_AGE * 1000);
-  const token = await encrypt({ username });
+  const token = await encrypt({ username, role });
   const cookieStore = await cookies();
   cookieStore.set(COOKIE_NAME, token, {
     httpOnly: true,

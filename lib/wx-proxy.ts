@@ -1,7 +1,8 @@
 const STORAGE_KEY = "wxBaseUrl";
 const CACHE_PREFIX = "wx:cache:";
 const CACHE_INDEX_KEY = "wx:cache:idx";
-const DEFAULT_TTL = 3_600_000; // 1 hour
+const DEFAULT_TTL =
+  process.env.NODE_ENV === "production" ? 3_600_000 : 60_000; // 1 hour in prod, 1 min in dev
 
 export type WxCacheConfig = {
   enabled?: boolean;

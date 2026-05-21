@@ -1,3 +1,9 @@
+import { jwtVerify } from "jose";
+import { TESTER_ALLOWED_API_PATHS } from "@/lib/auth";
+
+const encodedKey = new TextEncoder().encode(process.env.AUTH_SECRET!);
+const COOKIE_NAME = "session";
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ path: string[] }> }
@@ -26,6 +32,38 @@ export async function DELETE(
   return handleProxy(request, params);
 }
 
+async function getSessionFromRequest(
+  request: Request
+): Promise<{ username: string; role: string } | null> {
+  const cookieHeader = request.headers.get("cookie");
+  if (!cookieHeader) return null;
+
+  const cookies = cookieHeader
+    .split(";")
+    .map((c) => c.trim())
+    .reduce<Record<string, string>>((acc, pair) => {
+      const eq = pair.indexOf("=");
+      if (eq === -1) return acc;
+      const key = pair.slice(0, eq).trim();
+      const val = pair.slice(eq + 1).trim();
+      if (key) acc[key] = val;
+      return acc;
+    }, {});
+  const sessionCookie = cookies[COOKIE_NAME];
+  if (!sessionCookie) return null;
+
+  try {
+    const { payload } = await jwtVerify<{ username: string; role: string }>(
+      sessionCookie,
+      encodedKey,
+      { algorithms: ["HS256"] }
+    );
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
 async function handleProxy(
   request: Request,
   params: Promise<{ path: string[] }>
@@ -39,6 +77,25 @@ async function handleProxy(
   }
 
   const { path } = await params;
+
+  const session = await getSessionFromRequest(request);
+  if (!session) {
+    return Response.json(
+      { error: "Not authenticated" },
+      { status: 401 }
+    );
+  }
+
+  if (
+    session.role === "tester" &&
+    !TESTER_ALLOWED_API_PATHS.has(path[0])
+  ) {
+    return Response.json(
+      { error: "Access denied. This API endpoint is not available for your role." },
+      { status: 403 }
+    );
+  }
+
   const apiPath = path.join("/");
   const queryString = new URL(request.url).search;
   const url = `${baseUrl.replace(/\/+$/, "")}/${apiPath}${queryString}`;

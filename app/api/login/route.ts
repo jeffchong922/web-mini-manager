@@ -1,5 +1,5 @@
 import { createSession } from "@/lib/session";
-import crypto from "crypto";
+import { parseUsers, findMatchingUser, type AuthUser } from "@/lib/auth";
 
 export async function POST(request: Request) {
   let body: { username?: string; password?: string };
@@ -11,32 +11,39 @@ export async function POST(request: Request) {
 
   const { username, password } = body;
   if (!username || !password) {
-    return Response.json({ error: "Username and password are required" }, { status: 400 });
+    return Response.json(
+      { error: "Username and password are required" },
+      { status: 400 }
+    );
   }
 
-  const expectedUser = process.env.AUTH_USERNAME;
-  const expectedPass = process.env.AUTH_PASSWORD;
-
-  if (!expectedUser || !expectedPass) {
-    return Response.json({ error: "Server configuration error" }, { status: 500 });
+  let users: AuthUser[] = [];
+  const authUsersStr = process.env.AUTH_USERS;
+  if (authUsersStr) {
+    users = parseUsers(authUsersStr);
   }
 
-  const userBuf = Buffer.from(username);
-  const passBuf = Buffer.from(password);
-  const expectedUserBuf = Buffer.from(expectedUser);
-  const expectedPassBuf = Buffer.from(expectedPass);
+  // Legacy fallback: single AUTH_USERNAME/AUTH_PASSWORD, role = admin
+  if (users.length === 0) {
+    const legacyUser = process.env.AUTH_USERNAME;
+    const legacyPass = process.env.AUTH_PASSWORD;
+    if (legacyUser && legacyPass) {
+      users = [{ username: legacyUser, password: legacyPass, role: "admin" }];
+    }
+  }
 
-  const userMatch =
-    userBuf.length === expectedUserBuf.length &&
-    crypto.timingSafeEqual(userBuf, expectedUserBuf);
-  const passMatch =
-    passBuf.length === expectedPassBuf.length &&
-    crypto.timingSafeEqual(passBuf, expectedPassBuf);
+  if (users.length === 0) {
+    return Response.json(
+      { error: "Server configuration error" },
+      { status: 500 }
+    );
+  }
 
-  if (!userMatch || !passMatch) {
+  const matched = findMatchingUser(users, username, password);
+  if (!matched) {
     return Response.json({ error: "Invalid credentials" }, { status: 401 });
   }
 
-  await createSession(username);
+  await createSession(matched.username, matched.role);
   return Response.json({ success: true });
 }

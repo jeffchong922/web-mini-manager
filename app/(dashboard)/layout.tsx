@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const NAV_ITEMS = [
   { label: "Welcome", href: "/" },
@@ -19,6 +19,29 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/session")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setUserRole(data.role);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Heartbeat to keep session alive (proxy refreshes JWT on each request)
+  useEffect(() => {
+    const id = setInterval(() => {
+      fetch("/api/session").catch(() => {});
+    }, 15 * 60 * 1000); // every 15 minutes
+    return () => clearInterval(id);
+  }, []);
+
+  const visibleNavItems = NAV_ITEMS.filter((item) => {
+    if (userRole === "tester" && item.href === "/templates") return false;
+    return true;
+  });
 
   return (
     <div className="flex h-screen bg-zinc-50 dark:bg-black">
@@ -51,7 +74,7 @@ export default function DashboardLayout({
           </button>
         </div>
         <nav className="flex flex-1 flex-col gap-1 p-3">
-          {NAV_ITEMS.map((item) => {
+          {visibleNavItems.map((item) => {
             const isActive = pathname === item.href;
             return (
               <Link

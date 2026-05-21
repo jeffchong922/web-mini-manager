@@ -45,6 +45,16 @@ export default function TemplatesPage() {
   const [addingId, setAddingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [roleLoading, setRoleLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/session")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setUserRole(data?.role ?? null))
+      .catch(() => setUserRole(null))
+      .finally(() => setRoleLoading(false));
+  }, []);
 
   const load = useCallback(async (skipCache = false) => {
     if (skipCache) setError(null);
@@ -133,8 +143,9 @@ export default function TemplatesPage() {
   }, [drafts, loadDrafts]);
 
   useEffect(() => {
+    if (userRole === "tester" || roleLoading) return;
     queueMicrotask(() => { load(); });
-  }, [load]);
+  }, [load, userRole, roleLoading]);
 
   const totalPages = Math.max(1, Math.ceil((items?.length ?? 0) / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -145,6 +156,27 @@ export default function TemplatesPage() {
 
   const start = (items?.length ?? 0) === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
   const end = Math.min(safePage * PAGE_SIZE, items?.length ?? 0);
+
+  if (roleLoading) {
+    return (
+      <div className="flex flex-1 flex-col gap-6 p-8">
+        <p className="text-sm text-zinc-500">Loading...</p>
+      </div>
+    );
+  }
+
+  if (userRole === "tester") {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
+        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+          Access Denied
+        </h1>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          You do not have permission to access this page.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-8">

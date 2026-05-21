@@ -37,6 +37,7 @@ export default function MiniProgramsPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [refreshing, setRefreshing] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [qrModal, setQrModal] = useState<{
     appid: string;
     appName: string;
@@ -75,6 +76,13 @@ export default function MiniProgramsPage() {
   const [templateListError, setTemplateListError] = useState<string | null>(null);
   const [templatePage, setTemplatePage] = useState(1);
 
+  useEffect(() => {
+    fetch("/api/session")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setUserRole(data?.role ?? null))
+      .catch(() => setUserRole(null));
+  }, []);
+
   const load = useCallback(async (skipCache = false) => {
     if (skipCache) setError(null);
     try {
@@ -92,6 +100,39 @@ export default function MiniProgramsPage() {
       setError(e instanceof Error ? e.message : "Failed to load mini programs");
     }
   }, []);
+
+  const loadFromConfig = useCallback(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = localStorage.getItem("submitConfigs");
+      if (!raw) {
+        setItems([]);
+        return;
+      }
+      const configs: SubmitConfigItem[] = JSON.parse(raw);
+      const mapped: MiniProgramItem[] = configs.map((c) => ({
+        authorizer_appid: c.appid,
+        appName: (c.ext?.appName as string) || c.appid,
+        status: "OPEN",
+        auth_time: "",
+        refresh_token: "",
+      }));
+      setItems(mapped);
+    } catch {
+      setItems([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!userRole) return;
+    queueMicrotask(() => {
+      if (userRole === "tester") {
+        loadFromConfig();
+      } else {
+        load();
+      }
+    });
+  }, [userRole, load, loadFromConfig]);
 
   const handleViewQrCode = useCallback((appid: string, appName: string) => {
     setQrModal({ appid, appName });
@@ -328,10 +369,6 @@ export default function MiniProgramsPage() {
     }
   }
 
-  useEffect(() => {
-    queueMicrotask(() => { load(); });
-  }, [load]);
-
   const filtered = useMemo(() => {
     if (!items) return [];
     const q = search.toLowerCase();
@@ -477,12 +514,14 @@ export default function MiniProgramsPage() {
                           >
                             查看二维码
                           </button>
+                          {userRole !== "tester" && (
                           <button
                             onClick={() => openTesterModal(item.authorizer_appid, item.appName)}
                             className="rounded-lg px-2 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
                           >
                             体验者
                           </button>
+                          )}
                           {getSubmitConfig(item.authorizer_appid) && item.status === 'OPEN' ? (
                             <button
                               onClick={() => openSubmitModal(item.authorizer_appid, item.appName)}
@@ -537,12 +576,14 @@ export default function MiniProgramsPage() {
                       >
                         查看二维码
                       </button>
+                      {userRole !== "tester" && (
                       <button
                         onClick={() => openTesterModal(item.authorizer_appid, item.appName)}
                         className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
                       >
                         体验者
                       </button>
+                      )}
                       {getSubmitConfig(item.authorizer_appid) && item.status === 'OPEN' ? (
                         <button
                           onClick={() => openSubmitModal(item.authorizer_appid, item.appName)}
