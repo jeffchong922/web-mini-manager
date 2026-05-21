@@ -241,7 +241,7 @@ export default function SubmitConfigsPage() {
         <p className="text-sm text-zinc-500">No configs yet. Paste JSON above to import.</p>
       ) : (
         <>
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center gap-3">
                 <input
                   type="text"
                   value={search}
@@ -250,7 +250,7 @@ export default function SubmitConfigsPage() {
                     setPage(1);
                   }}
                   placeholder="Search by app ID..."
-                  className="w-72 rounded-lg border border-zinc-300 px-4 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
+                  className="min-w-0 flex-1 rounded-lg border border-zinc-300 px-4 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 sm:min-w-[200px] sm:flex-none sm:w-72 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
                 />
                 <select
                   value={isStopFilter}
@@ -285,7 +285,8 @@ export default function SubmitConfigsPage() {
                 </div>
               </div>
 
-              <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+              {/* Desktop table - hidden on mobile */}
+              <div className="hidden lg:block lg:overflow-hidden lg:rounded-xl lg:border lg:border-zinc-200 lg:bg-white lg:dark:border-zinc-800 lg:dark:bg-zinc-950">
                 <table className="w-full text-left text-sm">
                   <thead className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900">
                     <tr>
@@ -345,6 +346,49 @@ export default function SubmitConfigsPage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Mobile cards - hidden on desktop */}
+              <div className="flex flex-col gap-3 lg:hidden">
+                {paged.map((config) => (
+                  <div
+                    key={config.appid}
+                    className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-zinc-900 dark:text-zinc-50">
+                          {(config.ext.appName as string) || "-"}
+                        </div>
+                        <div className="mt-1 font-mono text-xs text-zinc-500 dark:text-zinc-400">{config.appid}</div>
+                      </div>
+                      <button
+                        onClick={() => toggleStop(config.appid)}
+                        className={`shrink-0 cursor-pointer rounded-full px-2 py-0.5 text-xs font-medium ${
+                          config.isStop
+                            ? "bg-yellow-100 text-yellow-700 hover:bg-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400"
+                            : "bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400"
+                        }`}
+                      >
+                        {config.isStop ? "暂停" : "正常"}
+                      </button>
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        onClick={() => openEdit(config)}
+                        className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(config.appid)}
+                        className="rounded-lg px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
 
               <div className="flex items-center justify-between">

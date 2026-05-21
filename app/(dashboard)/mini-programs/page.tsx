@@ -403,13 +403,13 @@ export default function MiniProgramsPage() {
         <p className="text-sm text-zinc-500">Loading...</p>
       ) : (
         <>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
             <input
               type="text"
               value={search}
               onChange={(e) => handleSearch(e.target.value)}
               placeholder="Search by name or app ID..."
-              className="w-72 rounded-lg border border-zinc-300 px-4 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
+              className="min-w-0 flex-1 rounded-lg border border-zinc-300 px-4 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 sm:min-w-[200px] sm:flex-none sm:w-72 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
             />
             {search && (
               <span className="text-xs text-zinc-400">
@@ -422,7 +422,8 @@ export default function MiniProgramsPage() {
             <p className="text-sm text-zinc-500">No mini programs found.</p>
           ) : (
             <>
-              <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+              {/* Desktop table - hidden on mobile */}
+              <div className="hidden lg:block lg:overflow-hidden lg:rounded-xl lg:border lg:border-zinc-200 lg:bg-white lg:dark:border-zinc-800 lg:dark:bg-zinc-950">
                 <table className="w-full text-left text-sm">
                   <thead className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900">
                     <tr>
@@ -502,6 +503,64 @@ export default function MiniProgramsPage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Mobile cards - hidden on desktop */}
+              <div className="flex flex-col gap-3 lg:hidden">
+                {paged.map((item) => (
+                  <div
+                    key={item.authorizer_appid}
+                    className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-zinc-900 dark:text-zinc-50">{item.appName}</div>
+                        <div className="mt-1 font-mono text-xs text-zinc-500 dark:text-zinc-400">{item.authorizer_appid}</div>
+                      </div>
+                      <span
+                        className={`shrink-0 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                          item.status === "OPEN"
+                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                            : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                        }`}
+                      >
+                        {item.status}
+                      </span>
+                    </div>
+                    <div className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                      授权时间: {formatTimestamp(item.auth_time)}
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        onClick={() => handleViewQrCode(item.authorizer_appid, item.appName)}
+                        className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                      >
+                        查看二维码
+                      </button>
+                      <button
+                        onClick={() => openTesterModal(item.authorizer_appid, item.appName)}
+                        className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                      >
+                        体验者
+                      </button>
+                      {getSubmitConfig(item.authorizer_appid) && item.status === 'OPEN' ? (
+                        <button
+                          onClick={() => openSubmitModal(item.authorizer_appid, item.appName)}
+                          className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                        >
+                          提交
+                        </button>
+                      ) : (
+                        <span
+                          className="rounded-lg px-3 py-1.5 text-xs text-zinc-400 dark:text-zinc-500"
+                          title="未配置提交信息"
+                        >
+                          提交
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
 
               <div className="flex items-center justify-between">

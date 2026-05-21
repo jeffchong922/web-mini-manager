@@ -201,7 +201,8 @@ export default function TemplatesPage() {
         <p className="text-sm text-zinc-500">No templates found.</p>
       ) : (
         <>
-          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+          {/* Desktop table - hidden on mobile */}
+          <div className="hidden lg:block lg:overflow-hidden lg:rounded-xl lg:border lg:border-zinc-200 lg:bg-white lg:dark:border-zinc-800 lg:dark:bg-zinc-950">
             <table className="w-full text-left text-sm">
               <thead className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900">
                 <tr>
@@ -275,6 +276,58 @@ export default function TemplatesPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile cards - hidden on desktop */}
+          <div className="flex flex-col gap-3 lg:hidden">
+            {paged.map((item) => (
+              <div
+                key={item.templateId}
+                className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium text-zinc-900 dark:text-zinc-50">{item.userVersion}</div>
+                    <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{item.userDesc}</div>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                    v{item.userVersion}
+                  </span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2 font-mono text-xs text-zinc-500 dark:text-zinc-400">
+                  <span>Draft: {item.draftId}</span>
+                  <span>Template: {item.templateId}</span>
+                </div>
+                <div className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                  创建时间: {formatTimestamp(item.createTime)}
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(
+                        JSON.stringify({
+                          templateId: item.templateId,
+                          userVersion: item.userVersion,
+                          userDesc: item.userDesc,
+                        })
+                      );
+                      setCopiedId(item.templateId);
+                      setTimeout(() => setCopiedId(null), 1500);
+                    }}
+                    className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                  >
+                    {copiedId === item.templateId ? "已复制" : "复制"}
+                  </button>
+                  <button
+                    onClick={() => deleteTemplate(item.templateId)}
+                    disabled={deletingId === item.templateId}
+                    className="rounded-lg px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950"
+                  >
+                    {deletingId === item.templateId ? "..." : "删除"}
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
 
           <div className="flex items-center justify-between">
