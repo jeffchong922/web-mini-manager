@@ -15,8 +15,10 @@ npm run lint     # ESLint (Next.js core-web-vitals + typescript rules)
 
 ## Environment variables
 
-- `AUTH_USERNAME` / `AUTH_PASSWORD` — credentials for the single admin user. Compared with `crypto.timingSafeEqual`.
-- `AUTH_SECRET` — HS256 symmetric key for JWT session tokens. Must be >= 32 chars. Used by both `lib/session.ts` (server) and `proxy.ts` (middleware).
+- `AUTH_USERS` — multi-user credentials in `user:pass:role;user:pass:role` format. Roles: `admin` or `tester`. Parsed by `lib/auth.ts`.
+- `AUTH_USERNAME` / `AUTH_PASSWORD` — legacy fallback (single admin user). Only used when `AUTH_USERS` is empty.
+- `AUTH_SECRET` — HS256 symmetric key for JWT session tokens. Must be >= 32 chars. Used by `lib/session.ts` and `proxy.ts`.
+- `PORT` — server port (defaults to 9527 via `ecosystem.config.js` in production).
 
 ## Architecture
 
@@ -26,6 +28,14 @@ This is **not** standard Next.js. APIs, conventions, and file structure may diff
 
 - **No `middleware.ts`**. Instead, `proxy.ts` exports a named `proxy` function (receives `NextRequest`) and a `config.matcher`. The runtime picks it up as middleware automatically.
 - Route handlers receive `params` as a `Promise` (e.g. `{ params }: { params: Promise<{ path: string[] }> }`).
+
+### `proxy.ts` — middleware + auth guard
+
+`proxy.ts` is the Next.js middleware. It handles: auth gating (redirect to `/login`), public-path bypass (`/login`, `/api/login`), and JWT renewal on every request (sliding 3-hour expiry). Note: `proxy.ts` contains its own JWT sign/verify logic (duplicated from `lib/session.ts`) because middleware runs in an Edge-like runtime where `server-only` and `cookies()` from `next/headers` are unavailable.
+
+### PM2 production deployment
+
+`ecosystem.config.js` configures PM2 to run `npm start` on port 9527 (`PORT` env var) with `NODE_ENV=production`.
 
 ### Tailwind CSS v4
 
@@ -43,6 +53,8 @@ WeChat API response/request types live here: `ResponseData<T>`, `MiniProgramItem
 
 `lib/session.ts` imports `server-only` to prevent accidental client-side bundling of server secrets (JWT signing, cookie manipulation). Do the same for any new file that handles server-side secrets.
 
+`createSession(username, role)` stores the role in the JWT payload. `verifySession` is wrapped in React's `cache()` and returns `SessionPayload | null` (`{ username, role }`).
+
 ### Import alias
 
 `@/*` maps to the project root (`./*`), not `./src/*`. There is no `src/` directory.
@@ -52,14 +64,28 @@ WeChat API response/request types live here: `ResponseData<T>`, `MiniProgramItem
 1. `proxy.ts` runs on every matched request. It checks for a `session` cookie (JWT signed with HS256 via `jose`). Public paths: `/login`, `/api/login`.
 2. If unauthenticated and not on a public path → redirects to `/login?redirect=<original>`.
 3. If authenticated and on a public path → redirects to `/`.
-4. Login form (`app/login/page.tsx`) POSTs to `/api/login/route.ts`, which verifies credentials and calls `createSession()` from `lib/session.ts`.
-5. `lib/session.ts` uses React's `cache()` wrapper on `verifySession` so it deduplicates within a single render pass. Sessions expire after 30 minutes.
+4. On every authenticated request, the proxy refreshes the JWT with a fresh 3-hour expiry (sliding expiration).
+5. Login form (`app/login/page.tsx`) POSTs to `/api/login/route.ts`, which verifies credentials against `AUTH_USERS` (or legacy `AUTH_USERNAME`/`AUTH_PASSWORD`) and calls `createSession(username, role)`.
+6. `lib/session.ts` uses React's `cache()` wrapper on `verifySession` so it deduplicates within a single render pass.
+7. The dashboard layout (`app/(dashboard)/layout.tsx`) hits `/api/session` every 15 minutes as a heartbeat, keeping the session alive via the proxy's sliding refresh.
+
+### Role-based access control (`lib/auth.ts`)
+
+Two roles: `admin` (full access) and `tester` (limited access).
+
+- **`parseUsers(envValue)`** — parses `AUTH_USERS` env var (`"user:pass:role;user2:pass2:role2"`) into `AuthUser[]`.
+- **`findMatchingUser(users, username, password)`** — constant-time comparison via `crypto.timingSafeEqual`.
+- **`TESTER_ALLOWED_API_PATHS`** — WeChat API endpoints testers can call via the proxy: `getTestQrcode`, `codeCommit`, `gettemplatelist`. Other paths return 403.
+- **UI restrictions**: the dashboard layout hides the "Templates" nav item for tester-role users.
+- **`/api/session`** (GET) — returns `{ username, role }` for the current session (used by the layout to determine role-based UI).
 
 ### WeChat API proxy
 
 All WeChat API calls go through `/api/wx-proxy/[...path]/route.ts` to avoid CORS issues. The client must include an `X-Wx-Base-Url` header with the WeChat API base URL (stored in `localStorage` under key `wxBaseUrl`, set via the Settings page).
 
-Supported methods: GET, POST, PUT, DELETE. Only `content-type`, `authorization`, and `accept` headers are forwarded upstream.
+Supported methods: GET, POST, PUT, DELETE. Only `content-type`, `authorization`, and `accept` headers are forwarded upstream. The `Content-Encoding` header is stripped from the response since `fetch` transparently decompresses.
+
+The proxy enforces RBAC: it reads the session cookie directly from the request and checks tester-role users against `TESTER_ALLOWED_API_PATHS`. Non-matching paths return 403.
 
 ### Client-side WeChat API wrapper (`lib/wx-proxy.ts`)
 
