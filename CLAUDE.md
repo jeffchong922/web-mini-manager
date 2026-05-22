@@ -31,7 +31,9 @@ This is **not** standard Next.js. APIs, conventions, and file structure may diff
 
 ### `proxy.ts` — middleware + auth guard
 
-`proxy.ts` is the Next.js middleware. It handles: auth gating (redirect to `/login`), public-path bypass (`/login`, `/api/login`), and JWT renewal on every request (sliding 3-hour expiry). Note: `proxy.ts` contains its own JWT sign/verify logic (duplicated from `lib/session.ts`) because middleware runs in an Edge-like runtime where `server-only` and `cookies()` from `next/headers` are unavailable.
+`proxy.ts` is the Next.js middleware. It exports a named `proxy` function (receives `NextRequest`) and a `config.matcher` array. The runtime automatically picks it up as middleware — there is no `middleware.ts` file.
+
+`proxy.ts` handles: auth gating (redirect to `/login`), public-path bypass (`/login`, `/api/login`), and JWT renewal on every request (sliding 3-hour expiry). Note: `proxy.ts` contains its own JWT sign/verify logic (duplicated from `lib/session.ts`) because middleware runs in an Edge-like runtime where `server-only` and `cookies()` from `next/headers` are unavailable.
 
 ### PM2 production deployment
 
