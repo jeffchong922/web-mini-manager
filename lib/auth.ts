@@ -64,6 +64,4 @@ export function findMatchingUser(
 /** WeChat API endpoints that testers are allowed to call via the proxy. */
 export const TESTER_ALLOWED_API_PATHS = new Set([
   "getTestQrcode",
-  "codeCommit",
-  "gettemplatelist",
 ]);

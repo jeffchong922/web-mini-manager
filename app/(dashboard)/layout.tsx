@@ -40,7 +40,8 @@ export default function DashboardLayout({
   }, []);
 
   const visibleNavItems = NAV_ITEMS.filter((item) => {
-    if (userRole === "tester" && item.href === "/templates") return false;
+    if (!userRole) return false
+    if (userRole === "tester" && ["/mini-programs", "/templates", "/submit-configs"].includes(item.href) ) return false;
     return true;
   });
 

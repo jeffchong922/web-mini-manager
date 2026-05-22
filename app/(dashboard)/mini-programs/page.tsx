@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { wxFetch, getWxBaseUrl } from "@/lib/wx-proxy";
 import type { ResponseData, MiniProgramItem, TemplateItem } from "@/types/wx-api";
 import type { SubmitConfigItem } from "@/types/wx-api";
+import { useRole } from "@/hooks/useRole";
 
 const PAGE_SIZE = 10;
 
@@ -37,7 +38,6 @@ export default function MiniProgramsPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [refreshing, setRefreshing] = useState(false);
-  const [userRole, setUserRole] = useState<string | null>(null);
   const [qrModal, setQrModal] = useState<{
     appid: string;
     appName: string;
@@ -76,12 +76,7 @@ export default function MiniProgramsPage() {
   const [templateListError, setTemplateListError] = useState<string | null>(null);
   const [templatePage, setTemplatePage] = useState(1);
 
-  useEffect(() => {
-    fetch("/api/session")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => setUserRole(data?.role ?? null))
-      .catch(() => setUserRole(null));
-  }, []);
+  const [roleLoading, userRole] = useRole()
 
   const load = useCallback(async (skipCache = false) => {
     if (skipCache) setError(null);
@@ -393,6 +388,27 @@ export default function MiniProgramsPage() {
   function handleSearch(value: string) {
     setSearch(value);
     setPage(1);
+  }
+
+  if (roleLoading) {
+    return (
+      <div className="flex flex-1 flex-col gap-6 p-8">
+        <p className="text-sm text-zinc-500">Loading...</p>
+      </div>
+    );
+  }
+
+  if (userRole === "tester" || !userRole) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
+        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+          Access Denied
+        </h1>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          You do not have permission to access this page.
+        </p>
+      </div>
+    );
   }
 
   return (

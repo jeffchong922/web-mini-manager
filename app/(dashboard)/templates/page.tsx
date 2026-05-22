@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { wxFetch } from "@/lib/wx-proxy";
 import type { ResponseData, TemplateItem, DraftItem } from "@/types/wx-api";
+import { useRole } from "@/hooks/useRole";
 
 const PAGE_SIZE = 10;
 
@@ -45,16 +46,8 @@ export default function TemplatesPage() {
   const [addingId, setAddingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [copiedId, setCopiedId] = useState<number | null>(null);
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [roleLoading, setRoleLoading] = useState(true);
 
-  useEffect(() => {
-    fetch("/api/session")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => setUserRole(data?.role ?? null))
-      .catch(() => setUserRole(null))
-      .finally(() => setRoleLoading(false));
-  }, []);
+  const [roleLoading, userRole] = useRole()
 
   const load = useCallback(async (skipCache = false) => {
     if (skipCache) setError(null);
@@ -165,7 +158,7 @@ export default function TemplatesPage() {
     );
   }
 
-  if (userRole === "tester") {
+  if (userRole === "tester" || !userRole) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">

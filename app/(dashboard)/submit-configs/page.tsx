@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo, useEffect } from "react";
 import type { SubmitConfigItem } from "@/types/wx-api";
+import { useRole } from "@/hooks/useRole";
 
 const STORAGE_KEY = "submitConfigs";
 const PAGE_SIZE = 10;
@@ -95,6 +96,8 @@ export default function SubmitConfigsPage() {
   const [isStopFilter, setIsStopFilter] = useState<"" | "true" | "false">("");
   const [editText, setEditText] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
+
+  const [roleLoading, userRole] = useRole()
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -202,6 +205,27 @@ export default function SubmitConfigsPage() {
   );
   const start = filtered.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
   const end = Math.min(safePage * PAGE_SIZE, filtered.length);
+
+  if (roleLoading) {
+    return (
+      <div className="flex flex-1 flex-col gap-6 p-8">
+        <p className="text-sm text-zinc-500">Loading...</p>
+      </div>
+    );
+  }
+
+  if (userRole === "tester" || !userRole) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
+        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+          Access Denied
+        </h1>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          You do not have permission to access this page.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-8">
