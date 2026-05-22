@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { label: "Mini Programs", href: "/mini-programs" },
   { label: "Templates", href: "/templates" },
   { label: "Submit Configs", href: "/submit-configs" },
+  { label: "Refund", href: "/refund" },
   { label: "Settings", href: "/settings" },
 ];
 
@@ -93,7 +94,7 @@ export default function DashboardLayout({
           })}
         </nav>
         <div className="border-t border-zinc-200 p-3 dark:border-zinc-800">
-          <form action="/api/logout" method="POST">
+          <form action="/api/logout" method="POST" onSubmit={() => localStorage.removeItem("refund_cookie")}>
             <button
               type="submit"
               className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/50 dark:hover:text-zinc-50"
