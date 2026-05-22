@@ -19,6 +19,8 @@ npm run lint     # ESLint (Next.js core-web-vitals + typescript rules)
 - `AUTH_USERNAME` / `AUTH_PASSWORD` — legacy fallback (single admin user). Only used when `AUTH_USERS` is empty.
 - `AUTH_SECRET` — HS256 symmetric key for JWT session tokens. Must be >= 32 chars. Used by `lib/session.ts` and `proxy.ts`.
 - `PORT` — server port (defaults to 9527 via `ecosystem.config.js` in production).
+- `REFUND_QUERY_API_TEST` / `REFUND_QUERY_API_UAT` — backend refund query API base URLs (used by `app/api/refund-query/route.ts`).
+- `NEXT_PUBLIC_REFUND_API_TEST` / `NEXT_PUBLIC_REFUND_API_UAT` — frontend refund submit API base URLs (used by `app/(dashboard)/refund/page.tsx`).
 
 ## Architecture
 
@@ -108,6 +110,7 @@ The proxy enforces RBAC: it reads the session cookie directly from the request a
 | `/templates` | `app/(dashboard)/templates/page.tsx` | Paginated table of code templates, with draft-to-template "add" modal and delete actions. |
 | `/submit-configs` | `app/(dashboard)/submit-configs/page.tsx` | Manages ext.json submission configs in localStorage (key `submitConfigs`). Import/export JSON, edit, delete, toggle isStop. Data consumed by mini-programs page for the "Submit" action. |
 | `/settings` | `app/(dashboard)/settings/page.tsx` | Configure WeChat API base URL (stored in localStorage under key `wxBaseUrl`) |
+| `/refund` | `app/(dashboard)/refund/page.tsx` | Submit refund by flow code; query refund records via backend API (cookie-based auth). Environment selector (test/UAT) switches between `NEXT_PUBLIC_REFUND_API_*` env vars. |
 | 404 | `app/not-found.tsx` | Custom 404 page |
 
 The `(dashboard)` route group shares a sidebar layout (`app/(dashboard)/layout.tsx`) with nav links and a Sign Out button that POSTs to `/api/logout`.
@@ -115,6 +118,8 @@ The `(dashboard)` route group shares a sidebar layout (`app/(dashboard)/layout.t
 **Data fetching pattern**: Client pages defer initial data loads past render via `useEffect(() => { queueMicrotask(() => { load(); }); }, [load])`. This avoids blocking the first paint. The `load` callback is wrapped in `useCallback` and accepts a `skipCache` boolean — pass `true` for refresh operations, `undefined`/omitted for cached reads.
 
 **Cross-page localStorage**: The `/submit-configs` page persists configs to `localStorage` under key `submitConfigs`. The `/mini-programs` page reads the same key to check whether each mini-program has a submit config — if present, the "Submit" button is active; otherwise it's greyed out. Both pages must stay in sync on the data shape (`SubmitConfigItem[]`).
+
+**Refund page localStorage**: The `/refund` page persists the query Cookie SESSION value to `localStorage` under key `refund_cookie` to avoid re-pasting on every visit.
 
 **No test framework**: No test runner (vitest, jest, etc.) is configured. There are no test files.
 
