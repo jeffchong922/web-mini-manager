@@ -1,4 +1,5 @@
 import { verifySession } from "@/lib/session";
+import Link from "next/link";
 
 const tutorialSteps = [
   {
@@ -80,12 +81,12 @@ export default async function DashboardHome() {
                 <p className="text-sm text-zinc-500 dark:text-zinc-400">
                   {step.description}
                 </p>
-                <a
+                <Link
                   href={step.href}
                   className="mt-2 inline-flex items-center text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
                 >
                   {step.linkText} →
-                </a>
+                </Link>
               </div>
             </div>
           ))}

@@ -37,6 +37,12 @@ export async function proxy(request: NextRequest) {
   const host = request.headers.get("host") || `localhost:${process.env.PORT || "3000"}`;
   const proto = request.headers.get("x-forwarded-proto") || "http";
 
+  if (pathname.startsWith("/refund") && proto === "https") {
+    return NextResponse.redirect(
+      new URL(`${pathname}${search}`, `http://${host}`)
+    );
+  }
+
   if (isPublic && session) {
     return NextResponse.redirect(new URL("/", `${proto}://${host}`));
   }
@@ -57,7 +63,6 @@ export async function proxy(request: NextRequest) {
     const newToken = await refreshJWT(session);
     response.cookies.set(COOKIE_NAME, newToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       maxAge: MAX_AGE,
       path: "/",
