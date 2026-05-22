@@ -2,9 +2,6 @@
 
 import { useState, useEffect } from "react";
 
-const REFUND_API_TEST = process.env.NEXT_PUBLIC_REFUND_API_TEST ?? "";
-const REFUND_API_UAT = process.env.NEXT_PUBLIC_REFUND_API_UAT ?? "";
-
 type Env = "test" | "uat";
 const ENV_OPTIONS: { value: Env; label: string }[] = [
   { value: "test", label: "Test" },
@@ -68,8 +65,6 @@ export default function RefundPage() {
   const [totalCount, setTotalCount] = useState(0);
   const [copyText, setCopyText] = useState("");
 
-  const refundApiUrl = env === "test" ? REFUND_API_TEST : REFUND_API_UAT;
-
   async function handleRefund(e: React.FormEvent) {
     e.preventDefault();
     if (!flowCode.trim()) {
@@ -77,21 +72,17 @@ export default function RefundPage() {
       return;
     }
 
-    if (!refundApiUrl) {
-      setMessage({ type: "error", text: "所选环境接口未配置" });
-      return;
-    }
-
     setLoading(true);
     setMessage(null);
 
     try {
-      const res = await fetch(`${refundApiUrl}?flowCode=${encodeURIComponent(flowCode.trim())}`, {
+      const res = await fetch(`/api/refund-submit/?flowCode=${encodeURIComponent(flowCode.trim())}`, {
         method: "POST",
         signal: AbortSignal.timeout(5000),
+        headers: { "X-Env": env },
       });
       const data = await res.json();
-      if (res.ok) {
+      if (data.code === "000000" && data.succeed) {
         setMessage({ type: "success", text: data.message || "退款成功" });
         setFlowCode("");
       } else {
