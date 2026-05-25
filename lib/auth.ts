@@ -1,67 +1,30 @@
-import crypto from "crypto";
+import { getUsersCollection } from "./mongodb";
+import { verifyPassword } from "./password";
+import type { UserRole } from "@/types/auth";
 
 export type AuthUser = {
   username: string;
-  password: string;
-  role: "admin" | "tester";
+  password?: string;
+  role: UserRole;
 };
 
-export type UserRole = "admin" | "tester";
+export type { UserRole };
 
-/**
- * Parse AUTH_USERS env var.
- * Format: "user1:pass1:role1;user2:pass2:role2"
- */
-export function parseUsers(envValue: string | undefined): AuthUser[] {
-  if (!envValue) return [];
-  return envValue
-    .split(";")
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .map((part) => {
-      const segments = part.split(":");
-      if (segments.length !== 3) {
-        throw new Error(
-          `Invalid AUTH_USERS entry: "${part}". Expected format: username:password:role`
-        );
-      }
-      const [username, password, role] = segments.map((s) => s.trim());
-      if (!username || !password) {
-        throw new Error("Username and password are required in AUTH_USERS.");
-      }
-      if (role !== "admin" && role !== "tester") {
-        throw new Error(
-          `Invalid role "${role}" in AUTH_USERS. Must be "admin" or "tester".`
-        );
-      }
-      return { username, password, role };
-    });
-}
-
-export function findMatchingUser(
-  users: AuthUser[],
+export async function validateCredentials(
   username: string,
   password: string
-): AuthUser | null {
-  const inputUserBuf = Buffer.from(username);
-  const inputPassBuf = Buffer.from(password);
+): Promise<AuthUser | null> {
+  const users = await getUsersCollection();
+  const user = await users.findOne({ username });
+  if (!user) return null;
 
-  for (const u of users) {
-    const expectedUserBuf = Buffer.from(u.username);
-    const expectedPassBuf = Buffer.from(u.password);
-    if (
-      inputUserBuf.length === expectedUserBuf.length &&
-      inputPassBuf.length === expectedPassBuf.length &&
-      crypto.timingSafeEqual(inputUserBuf, expectedUserBuf) &&
-      crypto.timingSafeEqual(inputPassBuf, expectedPassBuf)
-    ) {
-      return u;
-    }
-  }
-  return null;
+  const match = await verifyPassword(password, user.password);
+  if (!match) return null;
+
+  return { username: user.username, role: user.role };
 }
 
-/** WeChat API endpoints that testers are allowed to call via the proxy. */
-export const TESTER_ALLOWED_API_PATHS = new Set([
+/** WeChat API endpoints that non-admin users are allowed to call via the proxy. */
+export const USER_ALLOWED_API_PATHS = new Set([
   "getTestQrcode",
 ]);

@@ -1,5 +1,5 @@
 import { jwtVerify } from "jose";
-import { TESTER_ALLOWED_API_PATHS } from "@/lib/auth";
+import { USER_ALLOWED_API_PATHS } from "@/lib/auth";
 
 const encodedKey = new TextEncoder().encode(process.env.AUTH_SECRET!);
 const COOKIE_NAME = "session";
@@ -87,8 +87,8 @@ async function handleProxy(
   }
 
   if (
-    session.role === "tester" &&
-    !TESTER_ALLOWED_API_PATHS.has(path[0])
+    session.role !== "admin" &&
+    !USER_ALLOWED_API_PATHS.has(path[0])
   ) {
     return Response.json(
       { error: "Access denied. This API endpoint is not available for your role." },

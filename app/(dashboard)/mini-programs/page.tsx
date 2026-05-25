@@ -121,7 +121,7 @@ export default function MiniProgramsPage() {
   useEffect(() => {
     if (!userRole) return;
     queueMicrotask(() => {
-      if (userRole === "tester") {
+      if (userRole !== "admin") {
         loadFromConfig();
       } else {
         load();
@@ -398,7 +398,7 @@ export default function MiniProgramsPage() {
     );
   }
 
-  if (userRole === "tester" || !userRole) {
+  if (userRole !== "admin" || !userRole) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
@@ -530,7 +530,7 @@ export default function MiniProgramsPage() {
                           >
                             查看二维码
                           </button>
-                          {userRole !== "tester" && (
+                          {userRole === "admin" && (
                           <button
                             onClick={() => openTesterModal(item.authorizer_appid, item.appName)}
                             className="rounded-lg px-2 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
@@ -592,7 +592,7 @@ export default function MiniProgramsPage() {
                       >
                         查看二维码
                       </button>
-                      {userRole !== "tester" && (
+                      {userRole === "admin" && (
                       <button
                         onClick={() => openTesterModal(item.authorizer_appid, item.appName)}
                         className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"

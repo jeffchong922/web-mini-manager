@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { label: "Submit Configs", href: "/submit-configs" },
   { label: "Refund", href: "/refund" },
   { label: "Settings", href: "/settings" },
+  { label: "Users", href: "/users", adminOnly: true },
 ];
 
 export default function DashboardLayout({
@@ -41,7 +42,8 @@ export default function DashboardLayout({
 
   const visibleNavItems = NAV_ITEMS.filter((item) => {
     if (!userRole) return false
-    if (userRole === "tester" && ["/mini-programs", "/templates", "/submit-configs"].includes(item.href) ) return false;
+    if (item.adminOnly && userRole !== "admin") return false;
+    if (userRole === "user" && ["/mini-programs", "/templates", "/submit-configs"].includes(item.href) ) return false;
     return true;
   });
 
